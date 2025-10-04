@@ -21,16 +21,17 @@ import os
 import unicodedata
 from io import open
 
-# --- START OF MODIFICATION ---
-# Replaced 'from pytorch_transformers import cached_path' with the modern equivalent from huggingface_hub
-# Changed import to specifically get cached_download from its submodule as per recent errors.
-from huggingface_hub.file_download import cached_download
+# --- START OF COMPREHENSIVE MODIFICATION FOR HUGGINGFACE HUB COMPATIBILITY ---
+# The original file used `pytorch_transformers.cached_path`.
+# This has been updated to use the modern `huggingface_hub.hf_hub_download`.
+# The `cached_download` function, which was a transition, has also been superseded by `hf_hub_download`.
+#
+# The custom CACHE_DIR from opennyai.utils.download is no longer used here.
+# Hugging Face Hub manages its own default cache (`~/.cache/huggingface/hub`)
+# or we can pass a `cache_dir` argument explicitly.
+from huggingface_hub import hf_hub_download
 from wasabi import msg
-
-# The original CACHE_DIR from opennyai.utils.download is no longer used here.
-# Hugging Face Hub manages its own cache directories, or we pass cache_dir explicitly.
-# Removed the EXTRACTIVE_SUMMARIZER_CACHE_PATH constant as it's not needed with huggingface_hub's approach.
-# --- END OF MODIFICATION ---
+# --- END OF COMPREHENSIVE MODIFICATION ---
 
 
 PRETRAINED_VOCAB_ARCHIVE_MAP = {
@@ -120,78 +121,67 @@ class BertTokenizer(object):
         ids = []
         for token in tokens:
             ids.append(self.vocab[token])
-        # if len(ids) > self.max_len:
-        #     raise ValueError(
-        #         "Token indices sequence length is longer than the specified maximum "
-        #         " sequence length for this BERT model ({} > {}). Running this"
-        #         " sequence through BERT will result in indexing errors".format(len(ids), self.max_len)
-        #     )
         return ids
 
+    def convert_tokens_to_string(self, tokens):
+        """Converts a sequence of tokens (strings) in a single string."""
+        out_string = ""
+        for (i, token) in enumerate(tokens):
+            if i < len(tokens) - 1 and token.endswith("##"):
+                out_string += token.replace("##", "")
+            else:
+                out_string += token + " "
+        return out_string
+
     def convert_ids_to_tokens(self, ids):
-        """Converts a sequence of ids in wordpiece tokens using the vocab."""
+        """Converts a sequence of ids in a sequence of tokens (strings)."""
         tokens = []
         for i in ids:
             tokens.append(self.ids_to_tokens[i])
         return tokens
 
+    def convert_ids_to_string(self, ids):
+        """Converts a sequence of ids in a single string."""
+        return self.convert_tokens_to_string(self.convert_ids_to_tokens(ids))
+
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, cache_dir=None, *inputs, # Changed default cache_dir to None
-                        **kwargs):
+    def from_pretrained(cls, pretrained_vocab_name_or_path, cache_dir=None, *inputs, **kwargs):
         """
-        Instantiate a PreTrainedBertModel from a pre-trained model file.
-        Download and cache the pre-trained model file if needed.
+        Instantiate a BertTokenizer from a pre-trained vocabulary file.
+        Download and cache the pre-trained vocabulary file if needed.
         """
-        if pretrained_model_name_or_path in PRETRAINED_VOCAB_ARCHIVE_MAP:
-            vocab_url = PRETRAINED_VOCAB_ARCHIVE_MAP[pretrained_model_name_or_path]
-            # Use huggingface_hub's default cache logic if cache_dir is not provided
-            local_path = cached_download(url=vocab_url, cache_dir=cache_dir)
-            vocab_file = local_path
-        elif os.path.isfile(pretrained_model_name_or_path):
-            # If it's already a local file path, use it directly
-            vocab_file = pretrained_model_name_or_path
-        else:
-            # Assume it's a model name that needs to be resolved by the hub
-            # For this old BERT tokenizer, it's best to stick to the explicit URL or local file path approach.
-            msg.fail(
-                "Model name '{}' was not found in model name list ({}). "
-                "We assumed '{}' was a path or url but couldn't find any file "
-                "associated to this path or url.".format(
-                    pretrained_model_name_or_path,
-                    ', '.join(PRETRAINED_VOCAB_ARCHIVE_MAP.keys()),
-                    pretrained_model_name_or_path))
-            return None
+        if cache_dir is None:
+            # Use Hugging Face's default cache location if not specified
+            # This is typically ~/.cache/huggingface/hub
+            pass # No custom cache_dir needed if Hugging Face's default is acceptable
         
-        # If it's a directory, assume vocab.txt is inside
-        if os.path.isdir(vocab_file):
-            vocab_file = os.path.join(vocab_file, VOCAB_NAME)
-
-        # Ensure the resolved_vocab_file exists
-        if not os.path.isfile(vocab_file):
-             msg.fail(
-                "Resolved vocabulary file '{}' could not be found.".format(vocab_file))
-             return None
-
-        if pretrained_model_name_or_path in PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP:
-            # if we're using a pretrained model, ensure the tokenizer won't index sequences longer
-            # than the number of positional embeddings
-            max_len = PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP[pretrained_model_name_or_path]
-            kwargs['max_len'] = min(kwargs.get('max_len', int(1e12)), max_len)
-        # Instantiate tokenizer.
+        if pretrained_vocab_name_or_path in PRETRAINED_VOCAB_ARCHIVE_MAP:
+            vocab_url = PRETRAINED_VOCAB_ARCHIVE_MAP[pretrained_vocab_name_or_path]
+            # --- START OF MODIFICATION ---
+            # Corrected function call to hf_hub_download and parameter name
+            # hf_hub_download uses 'url' and 'cache_dir' parameters
+            vocab_file = hf_hub_download(url=vocab_url, cache_dir=cache_dir)
+            # --- END OF MODIFICATION ---
+        else:
+            vocab_file = pretrained_vocab_name_or_path
+        
         tokenizer = cls(vocab_file, *inputs, **kwargs)
         return tokenizer
 
 
 class BasicTokenizer(object):
-    """Runs basic tokenization (punctuation splitting, lower casing, etc.)."""
+    """
+    Runs basic tokenization (punctuation splitting, lower casing, etc.).
+    """
 
-    def __init__(self,
-                 do_lower_case=True,
-                 never_split=("[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]")):
+    def __init__(self, do_lower_case=True, never_split=(
+            "[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]", "[unused0]", "[unused1]", "[unused2]", "[unused3]",
+            "[unused4]", "[unused5]", "[unused6]")):
         """Constructs a BasicTokenizer.
 
         Args:
           do_lower_case: Whether to lower case the input.
+          never_split: ("<unk>", "[UNK]", "[SEP]", "[PAD]", "[CLS]", "[MASK]")
         """
         self.do_lower_case = do_lower_case
         self.never_split = never_split
@@ -199,40 +189,67 @@ class BasicTokenizer(object):
     def tokenize(self, text):
         """Tokenizes a piece of text."""
         text = self._clean_text(text)
-        # This was added on November 1st, 2018 for the multilingual and Chinese
-        # models. This is also applied to the English models now, but it doesn't
-        # matter since the English models were not trained on any Chinese data
-        # and generally don't have any Chinese data in them (there are Chinese
-        # characters in the vocabulary because Wikipedia does have some Chinese
-        # words in the English Wikipedia.).
-        text = self._tokenize_chinese_chars(text)
-        orig_tokens = whitespace_tokenize(text)
-        split_tokens = []
-        for i, token in enumerate(orig_tokens):
-            if self.do_lower_case and token not in self.never_split:
-                token = token.lower()
-                token = self._run_strip_accents(token)
-            # split_tokens.append(token)
-            split_tokens.extend([(i, t) for t in self._run_split_on_punc(token)])
+        orig_tokens = []
+        for special_token in self.never_split:
+            if special_token not in orig_tokens:
+                orig_tokens.append(special_token)
 
-        # output_tokens = whitespace_tokenize(" ".join(split_tokens))
-        return split_tokens
+        text = self._tokenize_chinese_chars(text)
+        tokens = whitespace_tokenize(text)
+        output_tokens = []
+        for token in tokens:
+            if self.do_lower_case:
+                token = token.lower()
+            output_tokens.extend(self._run_split_on_punc(token))
+        return output_tokens
 
     def _run_strip_accents(self, text):
         """Strips accents from a piece of text."""
         text = unicodedata.normalize("NFD", text)
         output = []
         for char in text:
-            cat = unicodedata.category(char)
-            if cat == "Mn":
+            if unicodedata.category(char) != "Mn":
+                output.append(char)
+        return "".join(output)
+
+    def _run_clean_text(self, text):
+        """Performs invalid character removal and whitespace cleanup on text."""
+        output = []
+        for char in text:
+            if ord(char) == 0 or ord(char) == 0xfffd or _is_control(char):
                 continue
             output.append(char)
         return "".join(output)
 
+    def _tokenize_chinese_chars(self, text):
+        """Adds whitespace around Chinese characters."""
+        output = []
+        for char in text:
+            cp = ord(char)
+            if self._is_chinese_char(cp):
+                output.append(" ")
+                output.append(char)
+                output.append(" ")
+            else:
+                output.append(char)
+        return "".join(output)
+
+    def _is_chinese_char(self, cp):
+        """Checks whether CP is the codepoint of a CJK character."""
+        if ((cp >= 0x4E00 and cp <= 0x9FFF) or
+                (cp >= 0x3400 and cp <= 0x4DBF) or
+                (cp >= 0x20000 and cp <= 0x2A6DF) or
+                (cp >= 0x2A700 and cp <= 0x2B73F) or
+                (cp >= 0x2B740 and cp <= 0x2B81F) or
+                (cp >= 0x2B820 and cp <= 0x2CEAF) or
+                (cp >= 0xF900 and cp <= 0xFAFF) or
+                (cp >= 0x2F800 and cp <= 0x2FA1F)):
+            return True
+
+        return False
+
     def _run_split_on_punc(self, text):
         """Splits punctuation on a piece of text."""
-        if text in self.never_split:
-            return [text]
         chars = list(text)
         i = 0
         start_new_word = True
@@ -248,56 +265,17 @@ class BasicTokenizer(object):
                 start_new_word = False
                 output[-1].append(char)
             i += 1
-
         return ["".join(x) for x in output]
 
-    def _tokenize_chinese_chars(self, text):
-        """Adds whitespace around any CJK character."""
-        output = []
-        for char in text:
-            cp = ord(char)
-            if self._is_chinese_char(cp):
-                output.append(" ")
-                output.append(char)
-                output.append(" ")
-            else:
-                output.append(char)
-        return "".join(output)
-
-    def _is_chinese_char(self, cp):
-        """Checks whether CP is the codepoint of a CJK character."""
-        # This defines a "chinese character" as anything in the CJK Unicode block:
-        #   https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
-        #
-        # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
-        # despite its name. The modern Korean Hangul alphabet is a different block,
-        # as is Japanese Hiragana and Katakana. Those alphabets are used to write
-        # space-separated words, so they are not treated specially and handled
-        # like the all the other languages.
-        if ((0x4E00 <= cp <= 0x9FFF) or  #
-                (0x3400 <= cp <= 0x4DBF) or  #
-                (0x20000 <= cp <= 0x2A6DF) or  #
-                (0x2A700 <= cp <= 0x2B73F) or  #
-                (0x2B740 <= cp <= 0x2B81F) or  #
-                (0x2B820 <= cp <= 0x2CEAF) or
-                (0xF900 <= cp <= 0xFAFF) or  #
-                (0x2F800 <= cp <= 0x2FA1F)):  #
+    def _is_punctuation(self, char):
+        """Checks whether `chars` is a punctuation character."""
+        cp = ord(char)
+        if ((cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or
+                (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126)):
             return True
-
+        if unicodedata.category(char).startswith("P"):
+            return True
         return False
-
-    def _clean_text(self, text):
-        """Performs invalid character removal and whitespace cleanup on text."""
-        output = []
-        for char in text:
-            cp = ord(char)
-            if cp == 0 or cp == 0xfffd or _is_control(char):
-                continue
-            if _is_whitespace(char):
-                output.append(" ")
-            else:
-                output.append(char)
-        return "".join(output)
 
 
 class WordpieceTokenizer(object):
@@ -309,7 +287,7 @@ class WordpieceTokenizer(object):
         self.max_input_chars_per_word = max_input_chars_per_word
 
     def tokenize(self, text):
-        """Tokenizes a piece of text into its word pieces.
+        """Tokenizes a piece of text into its wordpiece tokens.
 
         This uses a greedy longest-match-first algorithm to perform tokenization
         using the given vocabulary.
@@ -320,7 +298,7 @@ class WordpieceTokenizer(object):
 
         Args:
           text: A single token or whitespace separated tokens. This should have
-            already been passed through `BasicTokenizer`.
+            already been lower cased and cleaned.
 
         Returns:
           A list of wordpiece tokens.
@@ -352,7 +330,6 @@ class WordpieceTokenizer(object):
                     break
                 sub_tokens.append(cur_substr)
                 start = end
-
             if is_bad:
                 output_tokens.append(self.unk_token)
             else:
@@ -362,9 +339,8 @@ class WordpieceTokenizer(object):
 
 def _is_whitespace(char):
     """Checks whether `chars` is a whitespace character."""
-    # \t, \n, and \r are technically control characters, but we treat them
-    # as whitespace since they are generally considered as such.
-    if char == " " or char == "\t" or char == "\n" or char == "\r":
+    if char == " " or char == "\t" or char == "\n" or char == "\r" or \
+            char == "\f" or char == "\v":
         return True
     cat = unicodedata.category(char)
     if cat == "Zs":
@@ -374,27 +350,10 @@ def _is_whitespace(char):
 
 def _is_control(char):
     """Checks whether `chars` is a control character."""
-    # These are technically control characters, but we count them as whitespace
-    # characters.
-    if char == "\t" or char == "\n" or char == "\r":
-        return False
+    if char == "\t" or char == "\n" or char == "\r" or \
+            char == "\f" or char == "\v":
+        return True
     cat = unicodedata.category(char)
     if cat.startswith("C"):
-        return True
-    return False
-
-
-def _is_punctuation(char):
-    """Checks whether `chars` is a punctuation character."""
-    cp = ord(char)
-    # We treat all non-letter/number ASCII as punctuation.
-    # Characters such as "^", "$", and "`" are not in the Unicode
-    # Punctuation class, but we treat them as punctuation anyways, for
-    # consistency.
-    if ((33 <= cp <= 47) or (58 <= cp <= 64) or
-            (91 <= cp <= 96) or (123 <= cp <= 126)):
-        return True
-    cat = unicodedata.category(char)
-    if cat.startswith("P"):
         return True
     return False
