@@ -3,7 +3,7 @@ import os
 
 import torch
 import torch.nn as nn
-from pytorch_transformers import BertModel, BertConfig
+from transformers import BertModel, BertConfig
 from torch.nn.init import xavier_uniform_
 
 from opennyai.utils.download import CACHE_DIR
