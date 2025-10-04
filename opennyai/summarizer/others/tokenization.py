@@ -21,7 +21,7 @@ import os
 import unicodedata
 from io import open
 
-from pytorch_transformers import cached_path
+from transformers.file_utils import cached_path
 from wasabi import msg
 
 from opennyai.utils.download import CACHE_DIR
