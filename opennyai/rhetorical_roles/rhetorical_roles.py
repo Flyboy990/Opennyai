@@ -48,7 +48,7 @@ class RhetoricalRolePredictor():
         Instantiates Tokenizer for preprocessor to use
         Loads labels to name mapping file for post-processing inference response
         """
-        self.CACHE_DIR = os.path.join(str(Path.home()), '.opennyai')
+        self.CACHE_DIR = '/tmp/.opennyai' # Use a writable temporary directory
         self.hsln_format_txt_dirpath = os.path.join(self.CACHE_DIR, 'temp_hsln/pubmed-20k', )
         os.makedirs(self.hsln_format_txt_dirpath, exist_ok=True)
 
