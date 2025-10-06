@@ -86,7 +86,6 @@ def split_into_sentences_tokenize_write(data, custom_processed_data_path,
     with open(custom_processed_data_path, 'w+') as f:
         json.dump(output_json, f)
 
-
 def write_in_hsln_format(input_json, hsln_format_txt_dirpath, tokenizer):
     # tokenizer = BertTokenizer.from_pretrained(BERT_VOCAB, do_lower_case=True)
     json_format = json.load(open(input_json))
