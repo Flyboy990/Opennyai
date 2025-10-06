@@ -31,42 +31,44 @@ def attach_short_sentence_boundries_to_next(revised_sentence_boundries, doc_txt)
                     sentences_to_attach_to_next = sentence_boundry
     return concatenated_sentence_boundries
 
-
 def split_into_sentences_tokenize_write(data, custom_processed_data_path,
                                         hsln_format_txt_dirpath='datasets/pubmed-20k', verbose=False):
-    ########## This function accepts the input files in LS format, creates tokens and writes them with label as "NONE" to text file
+    ########## This function accepts plain text input and processes it for rhetorical role prediction
 
     if not os.path.exists(hsln_format_txt_dirpath):
         os.makedirs(hsln_format_txt_dirpath)
+    
+    # Load spaCy model once
+    nlp = spacy.load("en_core_web_sm")
+    
     max_length = 10000
     output_json = []
-    filename_sent_boundries = {}  ###### key is the filename and value is dict containing sentence spans {"abc.txt":{"sentence_span":[(1,10),(11,20),...]} , "pqr.txt":{...},...}
+    filename_sent_boundries = {}
+    
     if verbose:
         msg.info('Preprocessing rhetorical role model input!!!')
+    
     for data_dict in tqdm(data, disable=not verbose):
-
         doc_id = data_dict['file_id']
-        preamble_doc = data_dict['preamble_doc']
-        judgment_doc = data_dict['judgement_doc']
+        text = data_dict['text']  # Plain text string now
 
-        if filename_sent_boundries.get(doc_id) is None:  ##### Ignore if the file is already present
-
-            nlp_doc = spacy.tokens.Doc.from_docs([preamble_doc, judgment_doc])
+        if filename_sent_boundries.get(doc_id) is None:
+            # Process text with spaCy
+            nlp_doc = nlp(text)
             doc_txt = nlp_doc.text
+            
             sentence_boundries = [(sent.start_char, sent.end_char) for sent in nlp_doc.sents]
             revised_sentence_boundries = attach_short_sentence_boundries_to_next(sentence_boundries, doc_txt)
 
-            adjudicated_doc = {'id': doc_id,
-                               'data': {'preamble_text': preamble_doc.text,
-                                        'judgement_text': judgment_doc.text,
-                                        'text': doc_txt}
-                               }
+            adjudicated_doc = {
+                'id': doc_id,
+                'data': {'text': doc_txt}
+            }
 
-            adjudicated_doc['annotations'] = []
-            adjudicated_doc['annotations'].append({})
             adjudicated_doc['annotations'] = []
 
             filename_sent_boundries[doc_id] = {"sentence_span": []}
+            
             for sentence_boundry in revised_sentence_boundries:
                 sentence_txt = doc_txt[sentence_boundry[0]:sentence_boundry[1]]
 
@@ -79,7 +81,8 @@ def split_into_sentences_tokenize_write(data, custom_processed_data_path,
                     sent_data['labels'] = []
                     adjudicated_doc['annotations'].append(sent_data)
 
-        output_json.append(adjudicated_doc)
+            output_json.append(adjudicated_doc)
+    
     with open(custom_processed_data_path, 'w+') as f:
         json.dump(output_json, f)
 
