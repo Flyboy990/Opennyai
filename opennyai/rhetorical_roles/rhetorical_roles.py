@@ -48,16 +48,16 @@ class RhetoricalRolePredictor():
         self.initialize()
 
     def initialize(self):
-    """ Loads the model.pt file and initialized the model object.
-    Instantiates Tokenizer for preprocessor to use
-    Loads labels to name mapping file for post-processing inference response
-    """
-    # Force writable cache directory for HF Space
-    self.CACHE_DIR = os.getenv('OPENNYAI_CACHE_DIR', '/tmp/opennyai_temp')
-    os.makedirs(self.CACHE_DIR, exist_ok=True)
-    
-    self.hsln_format_txt_dirpath = os.path.join(self.CACHE_DIR, 'temp_hsln/pubmed-20k')
-    os.makedirs(self.hsln_format_txt_dirpath, exist_ok=True)
+        """ Loads the model.pt file and initialized the model object.
+        Instantiates Tokenizer for preprocessor to use
+        Loads labels to name mapping file for post-processing inference response
+        """
+        # Force writable cache directory for HF Space
+        self.CACHE_DIR = os.getenv('OPENNYAI_CACHE_DIR', '/tmp/opennyai_temp')
+        os.makedirs(self.CACHE_DIR, exist_ok=True)
+        
+        self.hsln_format_txt_dirpath = os.path.join(self.CACHE_DIR, 'temp_hsln/pubmed-20k')
+        os.makedirs(self.hsln_format_txt_dirpath, exist_ok=True)
 
         if self.use_gpu:
             if torch.cuda.is_available():
