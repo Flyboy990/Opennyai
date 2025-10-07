@@ -173,7 +173,7 @@ class ExtSummarizer(nn.Module):
             self.bert.model.embeddings.position_embeddings = my_pos_embeddings
 
         if checkpoint is not None:
-            self.load_state_dict(checkpoint['model'], strict=True)
+            self.load_state_dict(checkpoint['model'], strict=False)
         else:
             if args.param_init != 0.0:
                 for p in self.ext_layer.parameters():
