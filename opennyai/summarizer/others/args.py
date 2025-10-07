@@ -18,7 +18,7 @@ def __setargs__():
     parser.bert_data_path = EXTRACTIVE_SUMMARIZER_CACHE_PATH
     parser.model_path = EXTRACTIVE_SUMMARIZER_CACHE_PATH
     parser.result_path = EXTRACTIVE_SUMMARIZER_CACHE_PATH
-    parser.temp_dir = EXTRACTIVE_SUMMARIZER_CACHE_PATH
+    parser.temp_dir = '/tmp/huggingface'
     parser.batch_size = 5000
     parser.test_batch_size = 1
     parser.max_pos = 512
