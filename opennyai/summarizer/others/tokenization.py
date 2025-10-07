@@ -24,8 +24,34 @@ from io import open
 try:
     from transformers import cached_path
 except ImportError:
-    # cached_path removed in transformers 4.x
-    from transformers.utils import cached_file as cached_path
+    # cached_path removed in transformers 4.x - use huggingface_hub directly
+    from huggingface_hub import hf_hub_download
+    
+    def cached_path(url_or_filename, cache_dir=None):
+        """Wrapper for compatibility with old cached_path API"""
+        if url_or_filename.startswith('http'):
+            # Extract repo and filename from URL
+            # URL format: https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-vocab.txt
+            filename = url_or_filename.split('/')[-1]
+            # For bert models, use the bert-base-uncased repo
+            if 'bert-base-uncased' in url_or_filename:
+                repo_id = 'bert-base-uncased'
+            elif 'bert-large-uncased' in url_or_filename:
+                repo_id = 'bert-large-uncased'
+            elif 'bert-base-cased' in url_or_filename:
+                repo_id = 'bert-base-cased'
+            elif 'bert-large-cased' in url_or_filename:
+                repo_id = 'bert-large-cased'
+            else:
+                repo_id = 'bert-base-uncased'  # default
+            
+            return hf_hub_download(
+                repo_id=repo_id,
+                filename=filename,
+                cache_dir=cache_dir
+            )
+        else:
+            return url_or_filename
 from wasabi import msg
 
 from opennyai.utils.download import CACHE_DIR
