@@ -21,37 +21,6 @@ import os
 import unicodedata
 from io import open
 
-try:
-    from transformers import cached_path
-except ImportError:
-    # cached_path removed in transformers 4.x - use huggingface_hub directly
-    from huggingface_hub import hf_hub_download
-    
-    def cached_path(url_or_filename, cache_dir=None):
-        """Wrapper for compatibility with old cached_path API"""
-        if url_or_filename.startswith('http'):
-            # Extract repo and filename from URL
-            # URL format: https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased-vocab.txt
-            filename = url_or_filename.split('/')[-1]
-            # For bert models, use the bert-base-uncased repo
-            if 'bert-base-uncased' in url_or_filename:
-                repo_id = 'bert-base-uncased'
-            elif 'bert-large-uncased' in url_or_filename:
-                repo_id = 'bert-large-uncased'
-            elif 'bert-base-cased' in url_or_filename:
-                repo_id = 'bert-base-cased'
-            elif 'bert-large-cased' in url_or_filename:
-                repo_id = 'bert-large-cased'
-            else:
-                repo_id = 'bert-base-uncased'  # default
-            
-            return hf_hub_download(
-                repo_id=repo_id,
-                filename=filename,
-                cache_dir=cache_dir
-            )
-        else:
-            return url_or_filename
 from wasabi import msg
 
 from opennyai.utils.download import CACHE_DIR
@@ -167,37 +136,32 @@ class BertTokenizer(object):
         Instantiate a PreTrainedBertModel from a pre-trained model file.
         Download and cache the pre-trained model file if needed.
         """
-        if pretrained_model_name_or_path in PRETRAINED_VOCAB_ARCHIVE_MAP:
-            vocab_file = PRETRAINED_VOCAB_ARCHIVE_MAP[pretrained_model_name_or_path]
-        else:
-            vocab_file = pretrained_model_name_or_path
-        if os.path.isdir(vocab_file):
-            vocab_file = os.path.join(vocab_file, VOCAB_NAME)
-        # redirect to the cache, if necessary
+        # Use transformers' BertTokenizer to handle downloading
+        from transformers import BertTokenizer as ModernBertTokenizer
+        
         try:
-            resolved_vocab_file = cached_path(vocab_file, cache_dir=cache_dir)
-        except EnvironmentError:
-            msg.fail(
-                "Model name '{}' was not found in model name list ({}). "
-                "We assumed '{}' was a path or url but couldn't find any file "
-                "associated to this path or url.".format(
-                    pretrained_model_name_or_path,
-                    ', '.join(PRETRAINED_VOCAB_ARCHIVE_MAP.keys()),
-                    vocab_file))
+            # Let transformers handle the download and caching
+            modern_tokenizer = ModernBertTokenizer.from_pretrained(
+                pretrained_model_name_or_path,
+                do_lower_case=kwargs.get('do_lower_case', True),
+                cache_dir=cache_dir
+            )
+            
+            # Get vocab file path from modern tokenizer
+            vocab_file = modern_tokenizer.vocab_file
+            
+            # Set max_len if specified
+            if pretrained_model_name_or_path in PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP:
+                max_len = PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP[pretrained_model_name_or_path]
+                kwargs['max_len'] = min(kwargs.get('max_len', int(1e12)), max_len)
+            
+            # Instantiate our custom tokenizer with the vocab file
+            tokenizer = cls(vocab_file, *inputs, **kwargs)
+            return tokenizer
+            
+        except Exception as e:
+            msg.fail(f"Could not load tokenizer '{pretrained_model_name_or_path}': {e}")
             return None
-        # if resolved_vocab_file == vocab_file:
-        #     msg.info("loading vocabulary file {}".format(vocab_file))
-        # else:
-        #     msg.info("loading vocabulary file {} from cache at {}".format(
-        #         vocab_file, resolved_vocab_file))
-        if pretrained_model_name_or_path in PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP:
-            # if we're using a pretrained model, ensure the tokenizer won't index sequences longer
-            # than the number of positional embeddings
-            max_len = PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP[pretrained_model_name_or_path]
-            kwargs['max_len'] = min(kwargs.get('max_len', int(1e12)), max_len)
-        # Instantiate tokenizer.
-        tokenizer = cls(resolved_vocab_file, *inputs, **kwargs)
-        return tokenizer
 
 
 class BasicTokenizer(object):
