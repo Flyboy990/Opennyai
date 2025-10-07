@@ -21,7 +21,11 @@ import os
 import unicodedata
 from io import open
 
-from transformers import cached_path
+try:
+    from transformers import cached_path
+except ImportError:
+    # cached_path removed in transformers 4.x
+    from transformers.utils import cached_file as cached_path
 from wasabi import msg
 
 from opennyai.utils.download import CACHE_DIR
