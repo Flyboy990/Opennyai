@@ -14,7 +14,11 @@ from opennyai.utils.download import load_model_from_cache
 from .eval import infer_model
 from .models import BertHSLN
 from .task import pubmed_task
-
+# Ensure cache directory exists and is writable
+import os
+if 'OPENNYAI_CACHE_DIR' not in os.environ:
+    os.environ['OPENNYAI_CACHE_DIR'] = '/tmp/opennyai_temp'
+    os.makedirs('/tmp/opennyai_temp', exist_ok=True)
 
 class RhetoricalRolePredictor():
 
@@ -44,13 +48,16 @@ class RhetoricalRolePredictor():
         self.initialize()
 
     def initialize(self):
-        """ Loads the model.pt file and initialized the model object.
-        Instantiates Tokenizer for preprocessor to use
-        Loads labels to name mapping file for post-processing inference response
-        """
-        self.CACHE_DIR = os.path.join(str(Path.home()), '.opennyai')
-        self.hsln_format_txt_dirpath = os.path.join(self.CACHE_DIR, 'temp_hsln/pubmed-20k', )
-        os.makedirs(self.hsln_format_txt_dirpath, exist_ok=True)
+    """ Loads the model.pt file and initialized the model object.
+    Instantiates Tokenizer for preprocessor to use
+    Loads labels to name mapping file for post-processing inference response
+    """
+    # Force writable cache directory for HF Space
+    self.CACHE_DIR = os.getenv('OPENNYAI_CACHE_DIR', '/tmp/opennyai_temp')
+    os.makedirs(self.CACHE_DIR, exist_ok=True)
+    
+    self.hsln_format_txt_dirpath = os.path.join(self.CACHE_DIR, 'temp_hsln/pubmed-20k')
+    os.makedirs(self.hsln_format_txt_dirpath, exist_ok=True)
 
         if self.use_gpu:
             if torch.cuda.is_available():
