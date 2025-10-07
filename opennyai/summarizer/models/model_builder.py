@@ -118,25 +118,25 @@ def get_generator(vocab_size, dec_hidden_size, device):
 
 
 class Bert(nn.Module):
-    def __init__(self, large, temp_dir=EXTRACTIVE_SUMMARIZER_CACHE_PATH, finetune=False):
+    def __init__(self, large, temp_dir, finetune=False):
         super(Bert, self).__init__()
         
-        # CRITICAL: Force HF cache environment variables BEFORE any transformers calls
+        # CRITICAL: Set environment variables BEFORE any transformers calls
+        import os
         os.environ['HF_HOME'] = '/tmp/huggingface'
         os.environ['TRANSFORMERS_CACHE'] = '/tmp/huggingface'
         os.environ['HF_HUB_CACHE'] = '/tmp/huggingface'
         os.environ['HF_DATASETS_CACHE'] = '/tmp/huggingface'
         
-        # Ensure cache directory exists
+        # Ensure directories exist
         os.makedirs('/tmp/huggingface', exist_ok=True)
         
-        if (large):
+        if large:
             self.model = BertModel.from_pretrained('bert-large-uncased')
         else:
             self.model = BertModel.from_pretrained('bert-base-uncased')
 
         self.finetune = finetune
-
     def forward(self, x, segs, mask):
         if (self.finetune):
             top_vec, _ = self.model(x, segs, attention_mask=mask)
