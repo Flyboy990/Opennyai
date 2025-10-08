@@ -131,17 +131,17 @@ class Bert(nn.Module):
             self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
         else:
             self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
-
+        
         self.finetune = finetune
 
     def forward(self, x, segs, mask):
-    if (self.finetune):
-        top_vec, _ = self.model(input_ids=x, token_type_ids=segs, attention_mask=mask)
-    else:
-        self.eval()
-        with torch.no_grad():
+        if (self.finetune):
             top_vec, _ = self.model(input_ids=x, token_type_ids=segs, attention_mask=mask)
-    return top_vec
+        else:
+            self.eval()
+            with torch.no_grad():
+                top_vec, _ = self.model(input_ids=x, token_type_ids=segs, attention_mask=mask)
+        return top_vec
 
 
 class ExtSummarizer(nn.Module):
