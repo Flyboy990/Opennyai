@@ -121,11 +121,8 @@ class Bert(nn.Module):
     def __init__(self, large, temp_dir=EXTRACTIVE_SUMMARIZER_CACHE_PATH, finetune=False):
         super(Bert, self).__init__()
         
-        # CRITICAL: Force HuggingFace cache paths for containerized environments
-        import os
-        os.environ['HF_HOME'] = temp_dir
-        os.environ['TRANSFORMERS_CACHE'] = temp_dir
-        os.environ['HF_HUB_CACHE'] = temp_dir
+        # Ensure cache directory exists and is writable
+        os.makedirs(temp_dir, exist_ok=True)
         
         if (large):
             self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
