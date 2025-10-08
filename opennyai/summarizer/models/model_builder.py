@@ -118,34 +118,37 @@ def get_generator(vocab_size, dec_hidden_size, device):
 
 
 class Bert(nn.Module):
-    def __init__(self, large, temp_dir, finetune=False):
+    def __init__(self, large, temp_dir=EXTRACTIVE_SUMMARIZER_CACHE_PATH, finetune=False):
         super(Bert, self).__init__()
         
-        # CRITICAL: Set environment variables BEFORE any transformers calls
+        # CRITICAL: Force HuggingFace cache paths for containerized environments
         import os
-        os.environ['HF_HOME'] = '/tmp/huggingface'
-        os.environ['TRANSFORMERS_CACHE'] = '/tmp/huggingface'
-        os.environ['HF_HUB_CACHE'] = '/tmp/huggingface'
-        os.environ['HF_DATASETS_CACHE'] = '/tmp/huggingface'
+        os.environ['HF_HOME'] = temp_dir
+        os.environ['TRANSFORMERS_CACHE'] = temp_dir
+        os.environ['HF_HUB_CACHE'] = temp_dir
         
-        # Ensure directories exist
-        os.makedirs('/tmp/huggingface', exist_ok=True)
-        
-        if large:
-            self.model = BertModel.from_pretrained('bert-large-uncased')
+        if (large):
+            self.model = BertModel.from_pretrained('bert-large-uncased', cache_dir=temp_dir)
         else:
-            self.model = BertModel.from_pretrained('bert-base-uncased')
-
+            self.model = BertModel.from_pretrained('bert-base-uncased', cache_dir=temp_dir)
+        
         self.finetune = finetune
+    
     def forward(self, x, segs, mask):
         if (self.finetune):
-            top_vec, _ = self.model(x, segs, attention_mask=mask)
+            outputs = self.model(input_ids=x, token_type_ids=segs, attention_mask=mask)
         else:
             self.eval()
             with torch.no_grad():
-                top_vec, _ = self.model(x, segs, attention_mask=mask)
+                outputs = self.model(input_ids=x, token_type_ids=segs, attention_mask=mask)
+        
+        # Extract last_hidden_state from outputs
+        if hasattr(outputs, 'last_hidden_state'):
+            top_vec = outputs.last_hidden_state
+        else:
+            top_vec = outputs[0]
+        
         return top_vec
-
 
 class ExtSummarizer(nn.Module):
     def __init__(self, args, device, checkpoint):
