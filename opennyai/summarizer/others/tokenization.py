@@ -136,7 +136,6 @@ class BertTokenizer(object):
         Instantiate a PreTrainedBertModel from a pre-trained model file.
         Download and cache the pre-trained model file if needed.
         """
-        # Use transformers' BertTokenizer to handle downloading
         from transformers import BertTokenizer as ModernBertTokenizer
         
         try:
@@ -147,8 +146,18 @@ class BertTokenizer(object):
                 cache_dir=cache_dir
             )
             
-            # Get vocab file path from modern tokenizer
-            vocab_file = modern_tokenizer.vocab_file
+            # Create vocab file from the modern tokenizer's vocab
+            os.makedirs(cache_dir, exist_ok=True)
+            vocab_file = os.path.join(cache_dir, f'{pretrained_model_name_or_path.replace("/", "_")}_vocab.txt')
+            
+            # Write vocab to file if it doesn't exist
+            if not os.path.isfile(vocab_file):
+                with open(vocab_file, 'w', encoding='utf-8') as f:
+                    # Get vocab dict and sort by token id
+                    vocab_dict = modern_tokenizer.get_vocab()
+                    sorted_vocab = sorted(vocab_dict.items(), key=lambda x: x[1])
+                    for token, idx in sorted_vocab:
+                        f.write(token + '\n')
             
             # Set max_len if specified
             if pretrained_model_name_or_path in PRETRAINED_VOCAB_POSITIONAL_EMBEDDINGS_SIZE_MAP:
@@ -160,9 +169,10 @@ class BertTokenizer(object):
             return tokenizer
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             msg.fail(f"Could not load tokenizer '{pretrained_model_name_or_path}': {e}")
             return None
-
 
 class BasicTokenizer(object):
     """Runs basic tokenization (punctuation splitting, lower casing, etc.)."""
